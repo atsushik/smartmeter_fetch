@@ -71,7 +71,7 @@ try:
             dtStr = cur.strftime('%Y/%m/%dT%H:%M:%S')
             timestamp = cur.strftime('%s')
             print json.dumps({'timestamp':timestamp, 'datetime':dtStr, 'status':"SCAN FAILED", "method":"smartmeter"})
-            ser.setTimeout(2)
+            ser.setTimeout(1)
             ser.write("\n\r\n\rSKTERM\n\r")      # write a string
             sio.flush()
             lines = sio.readlines()
@@ -93,7 +93,6 @@ try:
     lines = sio.readlines()
     #print lines
 
-    start = datetime.now()
     sio.write(unicode("SKSREG S2 " + channel + "\n\r"))
     sio.flush()
     lines = sio.readlines()
@@ -113,6 +112,8 @@ try:
     sys.stdout.flush() 
         
     while True:
+        start = datetime.now()
+
         ser.setTimeout(0.1)
         sio.write(unicode("SKJOIN " + v6addr + "\n\r"))
         sio.flush()
@@ -124,10 +125,13 @@ try:
             if line.startswith("EVENT 22 "):
                 myv6addr = line.rstrip().split(" ")[2]
                 print >> sys.stderr, "MY_V6ADDR =", myv6addr
+            if line.startswith("EVENT 24 "):
+                print >> sys.stderr, "JOIN FAILED"
+                time.sleep(5)
+                break
             if line.startswith("EVENT 25 "):
                 print >> sys.stderr, "JOIN SUCCEEDED"
                 break
-
         sio.write(unicode("\n\r"))
         sio.flush()
         lines = sio.readlines()
@@ -141,7 +145,12 @@ try:
         ser.flush()
         sio.write(unicode("\n\r"))
         sio.flush()
+        cur = datetime.now()
         while (True):
+            elapsed = datetime.now() - start
+            elapsedSec = elapsed.seconds + elapsed.microseconds * 0.000001
+            if elapsedSec > 30:
+                break
             #line = ser.read(200)
             line = sio.readline()
             if line == "":
@@ -154,15 +163,19 @@ try:
                 print >> sys.stderr, "myaddr =", myaddr
                 print >> sys.stderr, "        ", myv6addr
                 if myaddr == myv6addr:
-                    cur = datetime.now()
                     dtStr = cur.strftime('%Y/%m/%dT%H:%M:%S')
-                    timestamp = cur.strftime('%s')
+                    timestamp = int(cur.strftime('%s'))
                     watt = int(buf[8].rstrip()[-8:], 16)
+                    if watt > 60000:
+                        ser.setTimeout(1)
+                        ser.write("\n\r\n\rSKTERM\n\r")      # write a string
+                        sio.flush()
+                        lines = sio.readlines()
+                        ser.close()             # close port
+                        break
                     print >> sys.stderr, "WATT =", watt
-                    elapsed = datetime.now() - start
-                    elapsedSec = elapsed.seconds + elapsed.microseconds * 0.000001
-                    elapsedStr = "%.6f" , elapsedSec
-                    print >> sys.stdout, json.dumps({'timestamp':timestamp, 'datetime':dtStr, 'watt':watt, "method":"smartmeter", "elapsedSeconds":elapsedSec})
+                    elapsedStr = "%.6f" % elapsedSec
+                    print >> sys.stdout, json.dumps({'timestamp':timestamp, 'datetime':dtStr, 'Watt':watt, "method":"smartmeter", "elapsedSeconds":elapsedSec})
                     sys.stdout.flush() 
                     ser.setTimeout(0.5)
                     ser.write("\n\r\n\rSKTERM\n\r")
@@ -175,7 +188,7 @@ try:
 
         #print lines
         
-        time.sleep(5)
+        time.sleep(10)
         #break
         
 finally:
