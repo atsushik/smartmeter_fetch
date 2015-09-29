@@ -169,9 +169,9 @@ try:
                     if watt > 60000:
                         ser.setTimeout(1)
                         ser.write("\n\r\n\rSKTERM\n\r")      # write a string
-                        sio.flush()
+                        ser.flush()
                         lines = sio.readlines()
-                        ser.close()             # close port
+                        #ser.close()             # close port
                         break
                     print >> sys.stderr, "WATT =", watt
                     elapsedStr = "%.6f" % elapsedSec
